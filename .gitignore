@@ -3,7 +3,8 @@ app/__pycache__/
 app/*.pyc
 app/clinic.db
 .terraform/
+terraform.tfvars
+*.tfvars
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
 .DS_Store

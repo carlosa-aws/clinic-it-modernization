@@ -1,18 +1,26 @@
 from flask import Flask, render_template, request, redirect, url_for
-import sqlite3
-from pathlib import Path
+import os
+import psycopg2
 
 app = Flask(__name__)
 
-DB_FILE = Path("clinic.db")
+
+def get_db_connection():
+    return psycopg2.connect(
+        host=os.environ["DB_HOST"],
+        database=os.environ["DB_NAME"],
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASSWORD"],
+        port=os.environ.get("DB_PORT", "5432")
+    )
 
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS patient_intake (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
             dob TEXT NOT NULL,
@@ -24,6 +32,7 @@ def init_db():
         )
     """)
     conn.commit()
+    cursor.close()
     conn.close()
 
 
@@ -42,14 +51,15 @@ def submit():
     symptoms = request.form["symptoms"]
     preferred_date = request.form["preferred_date"]
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO patient_intake (
             first_name, last_name, dob, phone, email, symptoms, preferred_date
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
     """, (first_name, last_name, dob, phone, email, symptoms, preferred_date))
     conn.commit()
+    cursor.close()
     conn.close()
 
     return redirect(url_for("admin"))
@@ -57,7 +67,7 @@ def submit():
 
 @app.route("/admin")
 def admin():
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT id, first_name, last_name, dob, phone, email, symptoms, preferred_date, created_at
@@ -65,6 +75,7 @@ def admin():
         ORDER BY created_at DESC
     """)
     submissions = cursor.fetchall()
+    cursor.close()
     conn.close()
 
     return render_template("admin.html", submissions=submissions)

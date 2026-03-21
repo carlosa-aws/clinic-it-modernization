@@ -198,6 +198,57 @@ resource "aws_instance" "app" {
   associate_public_ip_address = true
   iam_instance_profile        = aws_iam_instance_profile.ec2_ssm_profile.name
 
+  user_data = <<-EOF
+    #!/bin/bash
+    set -e
+
+    # Log everything
+    exec > /var/log/user-data.log 2>&1
+
+    echo "Starting EC2 bootstrap..."
+
+    # Update system
+    dnf update -y
+
+    # Install dependencies
+    dnf install -y python3 python3-pip git
+
+    # Set working directory
+    cd /home/ec2-user
+
+    # Clone repo (or pull if already exists)
+    if [ -d "clinic-it-modernization" ]; then
+      cd clinic-it-modernization
+      git pull origin main
+    else
+      git clone https://github.com/carlosa-aws/clinic-it-modernization.git
+      cd clinic-it-modernization
+
+
+    cd app
+
+    # Create virtual environment
+    python3 -m venv venv
+    source venv/bin/activate
+
+    # Install dependencies
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    pip install psycopg2-binary
+
+    # Set environment variables
+    export DB_HOST="${aws_db_instance.postgres.address}"
+    export DB_PORT="5432"
+    export DB_NAME="clinicdb"
+    export DB_USER="clinicadmin"
+    export DB_PASSWORD="${var.db_password}"
+
+    # Start Flask app on port 5001
+    nohup python app.py > app.log 2>&1 &
+
+    echo "Bootstrap complete!"
+    EOF
+
   root_block_device {
     volume_size = 10
     volume_type = "gp3"

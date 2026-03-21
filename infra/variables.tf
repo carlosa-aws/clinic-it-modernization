@@ -29,7 +29,7 @@ variable "public_subnet_2_cidr" {
 }
 
 variable "my_ip_cidr" {
-  description = "Your public IP in CIDR format for SSH access"
+  description = "Your public IP in CIDR format for temporary app testing"
   type        = string
 }
 
@@ -37,11 +37,6 @@ variable "instance_type" {
   description = "EC2 instance type"
   type        = string
   default     = "t3.micro"
-}
-
-variable "key_name" {
-  description = "Existing AWS EC2 key pair name"
-  type        = string
 }
 
 variable "db_name" {

@@ -92,7 +92,7 @@ resource "aws_route_table_association" "public_b" {
 
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.project_name}-ec2-sg"
-  description = "Allow HTTP from internet and SSH from my IP"
+  description = "Allow HTTP from internet"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -161,7 +161,7 @@ resource "aws_db_subnet_group" "db_subnets" {
 }
 
 resource "aws_iam_role" "ec2_ssm_role" {
-  name = "clinic-mvp-ec2-ssm-role"
+  name = "${var.project_name}-ec2-ssm-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -175,6 +175,9 @@ resource "aws_iam_role" "ec2_ssm_role" {
       }
     ]
   })
+  tags = {
+    Name = "${var.project_name}-ec2-ssm-role"
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "ec2_ssm_core" {
@@ -183,12 +186,12 @@ resource "aws_iam_role_policy_attachment" "ec2_ssm_core" {
 }
 
 resource "aws_iam_instance_profile" "ec2_ssm_profile" {
-  name = "clinic-mvp-ec2-ssm-profile"
+  name = "${var.project_name}-ec2-ssm-profile"
   role = aws_iam_role.ec2_ssm_role.name
 }
 
 resource "aws_instance" "app" {
-  ami                         = "ami-0c421724a94bba6d6"
+  ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.instance_type
   subnet_id                   = aws_subnet.public_a.id
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]

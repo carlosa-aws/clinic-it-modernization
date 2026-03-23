@@ -17,15 +17,27 @@ variable "vpc_cidr" {
 }
 
 variable "public_subnet_cidr" {
-  description = "Public subnet CIDR block"
+  description = "Public subnet A CIDR block"
   type        = string
   default     = "10.0.1.0/24"
 }
 
 variable "public_subnet_2_cidr" {
-  description = "Second subnet CIDR block for DB subnet group"
+  description = "Public subnet B CIDR block"
   type        = string
   default     = "10.0.2.0/24"
+}
+
+variable "private_subnet_cidr" {
+  description = "Private subnet A CIDR block"
+  type        = string
+  default     = "10.0.3.0/24"
+}
+
+variable "private_subnet_2_cidr" {
+  description = "Private subnet B CIDR block"
+  type        = string
+  default     = "10.0.4.0/24"
 }
 
 variable "my_ip_cidr" {

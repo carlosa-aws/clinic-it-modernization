@@ -22,3 +22,7 @@ output "db_username" {
   value     = aws_db_instance.postgres.username
   sensitive = true
 }
+
+output "app_url" {
+  value = "http://${aws_instance.app.public_ip}:5001"
+}

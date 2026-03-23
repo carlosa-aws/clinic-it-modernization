@@ -199,68 +199,68 @@ resource "aws_instance" "app" {
   iam_instance_profile        = aws_iam_instance_profile.ec2_ssm_profile.name
 
   user_data = <<-EOF
-    #!/bin/bash
-    set -e
-    exec > /var/log/user-data.log 2>&1
+#!/bin/bash
+set -e
+exec > /var/log/user-data.log 2>&1
 
-    echo "Starting EC2 bootstrap..."
+echo "Starting EC2 bootstrap..."
 
-    dnf update -y
-    dnf install -y python3 python3-pip git
+dnf update -y
+dnf install -y python3 python3-pip git
 
-    mkdir -p /opt
+mkdir -p /opt
 
-    cd /opt
-    if [ -d "clinic-it-modernization" ]; then
-      cd clinic-it-modernization
-      git pull origin main
-    else
-      git clone https://github.com/carlosa-aws/clinic-it-modernization.git
-      cd clinic-it-modernization
-    fi
+cd /opt
+if [ -d "clinic-it-modernization" ]; then
+  cd clinic-it-modernization
+  git pull origin main
+else
+  git clone https://github.com/carlosa-aws/clinic-it-modernization.git
+  cd clinic-it-modernization
+fi
 
-    cd /opt/clinic-it-modernization/app
+cd /opt/clinic-it-modernization/app
 
-    python3 -m venv venv
-    source venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 
-    pip install --upgrade pip
-    pip install -r requirements.txt
+pip install --upgrade pip
+pip install -r requirements.txt
 
-    cat > /etc/clinic-app.env <<EOT
- DB_HOST=${aws_db_instance.postgres.address}
- DB_PORT=5432
- DB_NAME=${var.db_name}
- DB_USER=${var.db_username}
- DB_PASSWORD=${var.db_password}
- EOT
+cat > /etc/clinic-app.env <<EOT
+DB_HOST=${aws_db_instance.postgres.address}
+DB_PORT=5432
+DB_NAME=${var.db_name}
+DB_USER=${var.db_username}
+DB_PASSWORD=${var.db_password}
+EOT
 
-    chown ec2-user:ec2-user /etc/clinic-app.env
-    chmod 600 /etc/clinic-app.env
+chown ec2-user:ec2-user /etc/clinic-app.env
+chmod 600 /etc/clinic-app.env
 
-    cat > /etc/systemd/system/clinic-app.service <<EOT
- [Unit]
- Description=Clinic Intake Flask App
- After=network.target
+cat > /etc/systemd/system/clinic-app.service <<EOT
+[Unit]
+Description=Clinic Intake Flask App
+After=network.target
 
- [Service]
- User=ec2-user
- Group=ec2-user
- WorkingDirectory=/opt/clinic-it-modernization/app
- EnvironmentFile=/etc/clinic-app.env
- ExecStart=/opt/clinic-it-modernization/app/venv/bin/gunicorn --bind 0.0.0.0:5001 app:app
- Restart=always
+[Service]
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/opt/clinic-it-modernization/app
+EnvironmentFile=/etc/clinic-app.env
+ExecStart=/opt/clinic-it-modernization/app/venv/bin/gunicorn --bind 0.0.0.0:5001 app:app
+Restart=always
 
- [Install]
- WantedBy=multi-user.target
- EOT
+[Install]
+WantedBy=multi-user.target
+EOT
 
-   systemctl daemon-reload
-   systemctl enable clinic-app
-   systemctl start clinic-app
+systemctl daemon-reload
+systemctl enable clinic-app
+systemctl start clinic-app
 
-   echo "Bootstrap complete!"
- EOF
+echo "Bootstrap complete!"
+EOF
 
   root_block_device {
     volume_size = 10

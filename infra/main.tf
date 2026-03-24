@@ -142,14 +142,6 @@ resource "aws_security_group" "ec2_sg" {
 
   }
 
-  ingress {
-    description = "Temporary Flask port from my IP"
-    from_port   = 5001
-    to_port     = 5001
-    protocol    = "tcp"
-    cidr_blocks = [var.my_ip_cidr]
-  }
-
   egress {
     description = "Allow all outbound"
     from_port   = 0

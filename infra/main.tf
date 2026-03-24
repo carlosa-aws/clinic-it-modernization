@@ -301,9 +301,12 @@ resource "aws_iam_role_policy" "ec2_ssm_parameter_access" {
       {
         Effect = "Allow"
         Action = [
-          "ssm:GetParameter"
+          "ssm:GetParameter",
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
         ]
-        Resource = aws_ssm_parameter.db_password.arn
+        Resource = "*"
       }
     ]
   })
@@ -332,6 +335,7 @@ echo "Starting EC2 bootstrap..."
 
 dnf update -y
 dnf install -y python3 python3-pip git nginx awscli
+dnf install -y amazon-cloudwatch-agent
 
 mkdir -p /opt
 
@@ -369,6 +373,39 @@ EOT
 
 chown ec2-user:ec2-user /etc/clinic-app.env
 chmod 600 /etc/clinic-app.env
+
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<EOT
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "${var.project_name}-system",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/var/log/nginx/access.log",
+            "log_group_name": "${var.project_name}-nginx-access",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/var/log/nginx/error.log",
+            "log_group_name": "${var.project_name}-nginx-error",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/var/log/user-data.log",
+            "log_group_name": "${var.project_name}-user-data",
+            "log_stream_name": "{instance_id}"
+          }
+        ]
+      }
+    }
+  }
+}
+EOT
 
 cat > /etc/systemd/system/clinic-app.service <<EOT
 [Unit]
@@ -409,6 +446,12 @@ systemctl start clinic-app
 nginx -t
 systemctl enable nginx
 systemctl restart nginx
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+  -s
 
 echo "Bootstrap complete!"
 EOF

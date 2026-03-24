@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for
 import os
+import time
 import psycopg2
 
 app = Flask(__name__)
@@ -15,25 +16,35 @@ def get_db_connection():
     )
 
 
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS patient_intake (
-            id SERIAL PRIMARY KEY,
-            first_name TEXT NOT NULL,
-            last_name TEXT NOT NULL,
-            dob TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            email TEXT NOT NULL,
-            symptoms TEXT NOT NULL,
-            preferred_date TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
+def init_db(max_retries=10, delay=10):
+    for attempt in range(1, max_retries + 1):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS patient_intake (
+                    id SERIAL PRIMARY KEY,
+                    first_name TEXT NOT NULL,
+                    last_name TEXT NOT NULL,
+                    dob TEXT NOT NULL,
+                    phone TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    symptoms TEXT NOT NULL,
+                    preferred_date TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print("Database initialized successfully.")
+            return
+        except Exception as e:
+            print(f"Database init attempt {attempt}/{max_retries} failed: {e}")
+            if attempt < max_retries:
+                time.sleep(delay)
+            else:
+                raise
 
 
 @app.route("/")

@@ -4,14 +4,15 @@ output "alb_dns_name" {
 
 output "alb_url" {
   value = "http://${aws_lb.app.dns_name}"
+
 }
 
-output "ec2_public_ip" {
-  value = aws_instance.app.public_ip
+output "launch_template_id" {
+  value = aws_launch_template.app.id
 }
 
-output "ec2_public_dns" {
-  value = aws_instance.app.public_dns
+output "autoscaling_group_name" {
+  value = aws_autoscaling_group.app.name
 }
 
 output "rds_endpoint" {

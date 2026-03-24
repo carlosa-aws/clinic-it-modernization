@@ -244,7 +244,7 @@ exec > /var/log/user-data.log 2>&1
 echo "Starting EC2 bootstrap..."
 
 dnf update -y
-dnf install -y python3 python3-pip git
+dnf install -y python3 python3-pip git nginx
 
 mkdir -p /opt
 
@@ -286,16 +286,35 @@ User=ec2-user
 Group=ec2-user
 WorkingDirectory=/opt/clinic-it-modernization/app
 EnvironmentFile=/etc/clinic-app.env
-ExecStart=/opt/clinic-it-modernization/app/venv/bin/gunicorn --bind 0.0.0.0:5001 app:app
+ExecStart=/opt/clinic-it-modernization/app/venv/bin/gunicorn --bind 127.0.0.1:5001 app:app
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOT
 
+cat > /etc/nginx/conf.d/clinic-app.conf <<EOT
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        proxy_pass http://127.0.0.1:5001;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOT
+
 systemctl daemon-reload
 systemctl enable clinic-app
 systemctl start clinic-app
+
+nginx -t
+systemctl enable nginx
+systemctl restart nginx
 
 echo "Bootstrap complete!"
 EOF

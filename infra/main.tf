@@ -296,6 +296,24 @@ resource "aws_iam_instance_profile" "ec2_ssm_profile" {
   role = aws_iam_role.ec2_ssm_role.name
 }
 
+resource "aws_iam_role_policy" "ec2_ssm_parameter_access" {
+  name = "${var.project_name}-ec2-ssm-parameter-access"
+  role = aws_iam_role.ec2_ssm_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter"
+        ]
+        Resource = aws_ssm_parameter.db_password.arn
+      }
+    ]
+  })
+}
+
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.instance_type
@@ -312,7 +330,7 @@ exec > /var/log/user-data.log 2>&1
 echo "Starting EC2 bootstrap..."
 
 dnf update -y
-dnf install -y python3 python3-pip git nginx
+dnf install -y python3 python3-pip git nginx awscli
 
 mkdir -p /opt
 
@@ -333,12 +351,19 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
+DB_PASSWORD=$(aws ssm get-parameter \
+  --name "/${var.project_name}/db/password" \
+  --with-decryption \
+  --region ${var.aws_region} \
+  --query 'Parameter.Value' \
+  --output text)
+
 cat > /etc/clinic-app.env <<EOT
 DB_HOST=${aws_db_instance.postgres.address}
 DB_PORT=5432
 DB_NAME=${var.db_name}
 DB_USER=${var.db_username}
-DB_PASSWORD=${var.db_password}
+DB_PASSWORD=$${DB_PASSWORD}
 EOT
 
 chown ec2-user:ec2-user /etc/clinic-app.env
@@ -396,7 +421,16 @@ EOF
     Name = "${var.project_name}-app"
   }
 }
+resource "aws_ssm_parameter" "db_password" {
+  name        = "/${var.project_name}/db/password"
+  description = "Database password for ${var.project_name}"
+  type        = "SecureString"
+  value       = var.db_password
 
+  tags = {
+    Name = "${var.project_name}-db-password"
+  }
+}
 resource "aws_db_instance" "postgres" {
   identifier              = "${var.project_name}-postgres"
   allocated_storage       = 20

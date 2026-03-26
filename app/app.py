@@ -91,6 +91,10 @@ def admin():
 
     return render_template("admin.html", submissions=submissions)
 
+@app.route("/health")
+def health():
+    return {"status": "ok"}, 200
+
 
 init_db()
 

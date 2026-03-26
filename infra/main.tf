@@ -304,12 +304,34 @@ resource "aws_iam_role_policy" "ec2_ssm_parameter_access" {
           "ssm:GetParameter",
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
           "logs:PutLogEvents"
         ]
         Resource = "*"
       }
     ]
   })
+}
+
+resource "aws_cloudwatch_log_group" "system" {
+  name              = "${var.project_name}-system"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "nginx_access" {
+  name              = "${var.project_name}-nginx-access"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "nginx_error" {
+  name              = "${var.project_name}-nginx-error"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "user_data" {
+  name              = "${var.project_name}-user-data"
+  retention_in_days = 7
 }
 
 resource "aws_launch_template" "app" {
@@ -424,6 +446,25 @@ Restart=always
 WantedBy=multi-user.target
 EOT
 
+mkdir -p /etc/nginx/conf.d
+rm -f /etc/nginx/conf.d/default.conf
+
+cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/etc/nginx/nginx.conf")
+text = path.read_text()
+
+start = text.find("    server {\n        listen       80;")
+end = text.find("\n# Settings for a TLS enabled server.")
+if start != -1 and end != -1 and start < end:
+    text = text[:start] + text[end:]
+    path.write_text(text)
+PY
+
+
 cat > /etc/nginx/conf.d/clinic-app.conf <<EOT
 server {
     listen 80;
@@ -489,6 +530,14 @@ resource "aws_autoscaling_group" "app" {
     id      = aws_launch_template.app.id
     version = "$Latest"
   }
+
+  depends_on = [
+    aws_lb_listener.http,
+    aws_cloudwatch_log_group.system,
+    aws_cloudwatch_log_group.nginx_access,
+    aws_cloudwatch_log_group.nginx_error,
+    aws_cloudwatch_log_group.user_data
+  ]
 
   tag {
     key                 = "Name"

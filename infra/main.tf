@@ -168,8 +168,75 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+
+  certificate_arn = aws_acm_certificate_validation.cert.certificate_arn
+
+  default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
+  }
+
+  depends_on = [aws_acm_certificate_validation.cert]
+
+}
+resource "aws_acm_certificate" "cert" {
+  domain_name       = "cloudalers.com"
+  validation_method = "DNS"
+
+  subject_alternative_names = ["*.cloudalers.com"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.cert.domain_validation_options :
+    dvo.domain_name => dvo
+  }
+
+  allow_overwrite = true
+  zone_id         = data.aws_route53_zone.main.zone_id
+  name            = each.value.resource_record_name
+  type            = each.value.resource_record_type
+  records         = [each.value.resource_record_value]
+  ttl             = 60
+}
+
+resource "aws_acm_certificate_validation" "cert" {
+  certificate_arn         = aws_acm_certificate.cert.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+data "aws_route53_zone" "main" {
+  name         = "cloudalers.com"
+  private_zone = false
+}
+
+resource "aws_route53_record" "clinic" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "clinic.cloudalers.com"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.app.dns_name
+    zone_id                = aws_lb.app.zone_id
+    evaluate_target_health = true
   }
 }
 

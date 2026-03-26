@@ -333,6 +333,290 @@ resource "aws_cloudwatch_log_group" "user_data" {
   name              = "${var.project_name}-user-data"
   retention_in_days = 7
 }
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  alarm_name          = "${var.project_name}-high-cpu"
+  alarm_description   = "Alarm when average EC2 CPU exceeds 70 percent"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 70
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.app.name
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "${var.project_name}-high-cpu"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
+  alarm_name          = "${var.project_name}-alb-unhealthy-hosts"
+  alarm_description   = "Alarm when ALB target group has unhealthy hosts"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "UnHealthyHostCount"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 1
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    LoadBalancer = aws_lb.app.arn_suffix
+    TargetGroup  = aws_lb_target_group.app.arn_suffix
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "${var.project_name}-alb-unhealthy-hosts"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "rds_high_cpu" {
+  alarm_name          = "${var.project_name}-rds-high-cpu"
+  alarm_description   = "Alarm when RDS CPU exceeds 70 percent"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/RDS"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 70
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.postgres.id
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "${var.project_name}-rds-high-cpu"
+  }
+}
+resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
+  alarm_name          = "${var.project_name}-rds-low-storage"
+  alarm_description   = "Alarm when RDS free storage drops below 2 GB"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "FreeStorageSpace"
+  namespace           = "AWS/RDS"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 2147483648
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.postgres.id
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "${var.project_name}-rds-low-storage"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
+  alarm_name          = "${var.project_name}-alb-5xx"
+  alarm_description   = "Alarm when ALB returns 5XX errors"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "HTTPCode_ELB_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    LoadBalancer = aws_lb.app.arn_suffix
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "${var.project_name}-alb-5xx"
+  }
+}
+resource "aws_cloudwatch_metric_alarm" "target_5xx" {
+  alarm_name          = "${var.project_name}-target-5xx"
+  alarm_description   = "Alarm when app targets return 5XX errors"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    LoadBalancer = aws_lb.app.arn_suffix
+    TargetGroup  = aws_lb_target_group.app.arn_suffix
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name = "${var.project_name}-target-5xx"
+  }
+}
+resource "aws_cloudwatch_dashboard" "main" {
+  dashboard_name = "${var.project_name}-dashboard"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        "type"   = "metric"
+        "x"      = 0
+        "y"      = 0
+        "width"  = 12
+        "height" = 6
+        "properties" = {
+          "title"   = "ALB Requests and Target Response Time"
+          "view"    = "timeSeries"
+          "stacked" = false
+          "region"  = var.aws_region
+          "metrics" = [
+            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", aws_lb.app.arn_suffix],
+            [".", "TargetResponseTime", ".", "."]
+          ]
+          "period" = 60
+          "stat"   = "Sum"
+        }
+      },
+      {
+        "type"   = "metric"
+        "x"      = 12
+        "y"      = 0
+        "width"  = 12
+        "height" = 6
+        "properties" = {
+          "title"   = "Healthy and Unhealthy Hosts"
+          "view"    = "timeSeries"
+          "stacked" = false
+          "region"  = var.aws_region
+          "metrics" = [
+            [
+              "AWS/ApplicationELB",
+              "HealthyHostCount",
+              "TargetGroup",
+              aws_lb_target_group.app.arn_suffix,
+              "LoadBalancer",
+              aws_lb.app.arn_suffix
+            ],
+            [
+              ".",
+              "UnHealthyHostCount",
+              ".",
+              ".",
+              ".",
+              "."
+            ]
+          ]
+          "period" = 60
+          "stat"   = "Average"
+        }
+      },
+      {
+        "type"   = "metric"
+        "x"      = 0
+        "y"      = 6
+        "width"  = 12
+        "height" = 6
+        "properties" = {
+          "title"   = "ALB 5XX and Target 5XX Errors"
+          "view"    = "timeSeries"
+          "stacked" = false
+          "region"  = var.aws_region
+          "metrics" = [
+            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", aws_lb.app.arn_suffix],
+            [
+              ".",
+              "HTTPCode_Target_5XX_Count",
+              "TargetGroup",
+              aws_lb_target_group.app.arn_suffix,
+              "LoadBalancer",
+              aws_lb.app.arn_suffix
+            ]
+          ]
+          "period" = 60
+          "stat"   = "Sum"
+        }
+      },
+      {
+        "type"   = "metric"
+        "x"      = 12
+        "y"      = 6
+        "width"  = 12
+        "height" = 6
+        "properties" = {
+          "title"   = "EC2 CPU Utilization"
+          "view"    = "timeSeries"
+          "stacked" = false
+          "region"  = var.aws_region
+          "metrics" = [
+            ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", aws_autoscaling_group.app.name]
+          ]
+          "period" = 300
+          "stat"   = "Average"
+        }
+      },
+      {
+        "type"   = "metric"
+        "x"      = 0
+        "y"      = 12
+        "width"  = 12
+        "height" = 6
+        "properties" = {
+          "title"   = "RDS CPU and Database Connections"
+          "view"    = "timeSeries"
+          "stacked" = false
+          "region"  = var.aws_region
+          "metrics" = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.postgres.id],
+            [".", "DatabaseConnections", ".", "."]
+          ]
+          "period" = 300
+          "stat"   = "Average"
+        }
+      },
+      {
+        "type"   = "metric"
+        "x"      = 12
+        "y"      = 12
+        "width"  = 12
+        "height" = 6
+        "properties" = {
+          "title"   = "RDS Free Storage Space"
+          "view"    = "timeSeries"
+          "stacked" = false
+          "region"  = var.aws_region
+          "metrics" = [
+            ["AWS/RDS", "FreeStorageSpace", "DBInstanceIdentifier", aws_db_instance.postgres.id]
+          ]
+          "period" = 300
+          "stat"   = "Average"
+        }
+      }
+    ]
+  })
+}
 
 resource "aws_launch_template" "app" {
   name_prefix   = "${var.project_name}-lt-"
@@ -544,6 +828,19 @@ resource "aws_autoscaling_group" "app" {
     value               = "${var.project_name}-app"
     propagate_at_launch = true
   }
+}
+resource "aws_sns_topic" "alerts" {
+  name = "${var.project_name}-alerts"
+
+  tags = {
+    Name = "${var.project_name}-alerts"
+  }
+}
+
+resource "aws_sns_topic_subscription" "email_alerts" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
 }
 
 resource "aws_ssm_parameter" "db_password" {

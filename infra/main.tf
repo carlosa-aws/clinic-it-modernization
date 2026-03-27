@@ -194,10 +194,8 @@ resource "aws_lb_listener" "https" {
 
 }
 resource "aws_acm_certificate" "cert" {
-  domain_name       = "cloudalers.com"
+  domain_name       = "clinic.cloudalers.com"
   validation_method = "DNS"
-
-  subject_alternative_names = ["*.cloudalers.com"]
 
   lifecycle {
     create_before_destroy = true
@@ -224,7 +222,7 @@ resource "aws_acm_certificate_validation" "cert" {
 }
 
 data "aws_route53_zone" "main" {
-  name         = "cloudalers.com"
+  name         = "clinic.cloudalers.com"
   private_zone = false
 }
 
@@ -242,7 +240,7 @@ resource "aws_route53_record" "clinic" {
 
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.project_name}-ec2-sg"
-  description = "Allow HTTP from internet"
+  description = "Allow HTTP from ALB"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -271,6 +269,14 @@ resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
   description = "Allow HTTP from internet to ALB"
   vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "HTTPS from internet"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   ingress {
     description = "HTTP from internet"

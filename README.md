@@ -416,7 +416,7 @@ The following resources were used throughout the design, deployment, and trouble
 AWS Certified Solutions Architect – Associate  
 CompTIA Network+  
 
-- GitHub: https://github.com/YOUR_GITHUB_USERNAME
+- GitHub: https://github.com/carlosa-aws
 - LinkedIn: https://www.linkedin.com/in/carlosalersfuentes
 
 ---

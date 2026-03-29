@@ -1,8 +1,8 @@
-# Clinic IT Modernization (AWS + Terraform + Linux + Flask + PostgreSQL)
+# Clinic IT Modernization 
 
 A hands-on cloud infrastructure project simulating the modernization of a small medical clinic’s legacy intake system into a secure, cloud-hosted web application.
 
-This project demonstrates practical **IT infrastructure**, **cloud**, **Linux administration**, **web application hosting**, **monitoring**, and **security hardening** skills using AWS and Terraform.
+This project demonstrates practical **IT infrastructure**, **cloud**, **Linux administration**, **web application hosting**, **monitoring**, and **security hardening** skills using AWS, Terraform, Linux, Flask and PostgreSQL.
 
 ---
 
